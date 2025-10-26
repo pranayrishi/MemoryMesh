@@ -1,0 +1,9 @@
+{
+  "scenario": "wandering",
+  "persona": "grandpa",
+  "duration": "24s",
+  "resolution": "1080p",
+  "model": "sora-2",
+  "segments": 2,
+  "generated_at": "2025-10-25 17:07:30"
+}

@@ -1,0 +1,39 @@
+{
+  "name": "memorymesh",
+  "version": "1.0.0",
+  "description": "AI-powered cognitive co-pilot for Alzheimer's care",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "nodemon backend/server.js",
+    "client": "cd frontend && npm start",
+    "install-all": "npm install && cd frontend && npm install",
+    "test-demo": "node backend/test-demo.js"
+  },
+  "keywords": [
+    "alzheimers",
+    "ai",
+    "healthcare",
+    "cognitive-care"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@google/generative-ai": "^0.1.3",
+    "cors": "^2.8.5",
+    "date-fns": "^2.30.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0",
+    "nodemailer": "^6.9.7",
+    "openai": "^4.20.1",
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.1"
+  }
+}

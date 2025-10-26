@@ -1,0 +1,47 @@
+{
+  "name": "memorymesh-frontend",
+  "version": "1.0.0",
+  "description": "MemoryMesh Caregiver Dashboard",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "react-router-dom": "^6.18.0",
+    "recharts": "^2.9.0",
+    "date-fns": "^2.30.0",
+    "lucide-react": "^0.292.0",
+    "@tensorflow/tfjs": "^4.11.0",
+    "@tensorflow-models/pose-detection": "^2.1.0",
+    "@mediapipe/pose": "^0.5.1675469404",
+    "@google/generative-ai": "^0.1.3"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.5"
+  }
+}

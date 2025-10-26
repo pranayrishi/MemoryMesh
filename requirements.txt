@@ -1,0 +1,11 @@
+# Python dependencies for MemoryMesh video generation and CV detection
+
+# OpenAI SDK for Sora-2 video generation
+openai>=1.0.0
+
+# Computer Vision
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Utilities
+python-dotenv>=1.0.0

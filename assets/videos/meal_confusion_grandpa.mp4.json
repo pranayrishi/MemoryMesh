@@ -1,0 +1,9 @@
+{
+  "scenario": "meal_confusion",
+  "persona": "grandpa",
+  "duration": "24s",
+  "resolution": "1080p",
+  "model": "sora-2",
+  "segments": 2,
+  "generated_at": "2025-10-25 16:33:25"
+}

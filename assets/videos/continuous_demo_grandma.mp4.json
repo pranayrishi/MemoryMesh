@@ -1,0 +1,30 @@
+{
+  "type": "continuous_demo",
+  "persona": "grandma",
+  "total_duration": "72.6s",
+  "scenario_count": 3,
+  "scenarios": [
+    {
+      "name": "meal_confusion",
+      "start_time": 0,
+      "end_time": 24,
+      "duration": 24,
+      "order": 1
+    },
+    {
+      "name": "stove_safety",
+      "start_time": 24,
+      "end_time": 48,
+      "duration": 24,
+      "order": 2
+    },
+    {
+      "name": "wandering",
+      "start_time": 48,
+      "end_time": 72,
+      "duration": 24,
+      "order": 3
+    }
+  ],
+  "generated_at": "2025-10-25 10:35:34"
+}
