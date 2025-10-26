@@ -45,7 +45,7 @@ class ElevenLabsService {
           },
           body: JSON.stringify({
             text: text,
-            model_id: options.model_id || 'eleven_monolingual_v1',
+            model_id: options.model_id || 'eleven_turbo_v2_5', // Use turbo model - faster and cheaper
             voice_settings: {
               stability: options.stability || 0.5,
               similarity_boost: options.similarity_boost || 0.75,

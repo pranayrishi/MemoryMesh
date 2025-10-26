@@ -25,6 +25,7 @@ function Dashboard({ patient, latestIntervention, visionAnalysis, statistics }) 
     }
   }, [latestIntervention]);
 
+
   const loadDashboardData = async () => {
     try {
       const [timelineData, summary] = await Promise.all([

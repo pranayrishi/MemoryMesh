@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import StatisticsPage from './pages/StatisticsPage';
 import LiveCameraFeed from './components/LiveCameraFeed';
 import DemoController from './components/DemoController';
+import SimpleTTS from './components/SimpleTTS';
 import websocket from './services/websocket';
 import api from './services/api';
 import { LayoutDashboard, BarChart3, Video } from 'lucide-react';
@@ -51,6 +52,51 @@ function App() {
       setTimeout(() => {
         loadStatistics();
       }, 500);
+    });
+
+    // Audio playback listeners
+    websocket.on('audio_ready', (data) => {
+      console.log('🎉 ELEVENLABS AUDIO READY!', data);
+      console.log('   Audio URL:', data.audioUrl);
+      console.log('   Will play in 24 seconds...');
+      
+      // Play ElevenLabs audio with 24 second delay
+      setTimeout(() => {
+        console.log('🎙️  PLAYING ELEVENLABS AUDIO NOW!');
+        const audio = new Audio(`http://localhost:5000${data.audioUrl}`);
+        audio.volume = 1.0;
+        
+        audio.onloadeddata = () => {
+          console.log('✅ ElevenLabs audio loaded successfully');
+        };
+        
+        audio.onplay = () => {
+          console.log('▶️  ElevenLabs audio playing!');
+        };
+        
+        audio.onerror = (err) => {
+          console.error('❌ Failed to play ElevenLabs audio:', err);
+          // Fallback to TTS
+          if (window.simpleTTSSpeak) {
+            console.log('⚠️  Falling back to browser TTS');
+            window.simpleTTSSpeak(data.message, 0);
+          }
+        };
+        
+        audio.play().catch(err => {
+          console.error('❌ Play promise rejected:', err);
+          if (window.simpleTTSSpeak) {
+            console.log('⚠️  Falling back to browser TTS');
+            window.simpleTTSSpeak(data.message, 0);
+          }
+        });
+      }, 24000); // 24 seconds
+    });
+
+    websocket.on('tts_fallback', (data) => {
+      console.log('🗣️  TTS fallback event received:', data);
+      // DISABLED - Only use ElevenLabs, no browser TTS fallback
+      console.log('⏭️  Skipping browser TTS - ElevenLabs only');
     });
 
     return () => {
@@ -183,6 +229,9 @@ function AppContent({ connected, patient, latestIntervention, visionAnalysis, st
 
       {/* Demo Controller - Fixed at bottom */}
       <DemoController />
+
+      {/* SimpleTTS - Bulletproof audio */}
+      <SimpleTTS />
     </div>
   );
 }

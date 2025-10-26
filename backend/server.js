@@ -19,6 +19,8 @@ const PersonaDetectionService = require('./services/PersonaDetectionService');
 const ContinuousDemoService = require('./services/ContinuousDemoService');
 const EmailNotificationService = require('./services/EmailNotificationService');
 const PoseAnalysisService = require('./services/PoseAnalysisService');
+const FetchAIService = require('./services/FetchAIService');
+const VideoTrackingService = require('./services/VideoTrackingService');
 
 // Initialize Express app
 const app = express();
@@ -35,15 +37,23 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Serve audio files from cache
 app.use('/audio', express.static(require('path').join(__dirname, '../audio-cache')));
 
-// Serve video files from assets
-app.use('/videos', express.static(require('path').join(__dirname, '../assets/videos')));
+// Serve video files from assets with CORS headers
+app.use('/videos', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+}, express.static(require('path').join(__dirname, '../assets/videos')));
+
+// Broadcast function (defined later, but referenced here)
+let broadcast;
 
 // Initialize services
 let patientProfile = new PatientProfile({});
 let visionService = new VisionService();
 let conversationEngine = new ConversationEngine(patientProfile);
 let voiceService = new VoiceService();
-let googleHomeService = new GoogleHomeService();
+let googleHomeService; // Will be initialized after broadcast function is defined
 let elevenLabsService = new ElevenLabsService();
 let omiService = new OMIService();
 let demoResponseService = new DemoResponseService(patientProfile);
@@ -52,21 +62,11 @@ let personaDetectionService = new PersonaDetectionService();
 let continuousDemoService = new ContinuousDemoService();
 let emailNotificationService = new EmailNotificationService();
 let poseAnalysisService = new PoseAnalysisService();
-let interventionCoordinator = new InterventionCoordinator(
-  patientProfile,
-  conversationEngine,
-  googleHomeService, // Use Google Home instead of basic voice service
-  emailNotificationService // Email notifications for caretaker
-);
+let fetchAIService = config.fetchaiApiKey ? new FetchAIService(config.fetchaiApiKey) : null;
+let videoTrackingService = new VideoTrackingService();
+let interventionCoordinator; // Will be initialized after googleHomeService
 
-// Initialize Google Home discovery
-googleHomeService.discoverDevices().then(devices => {
-  if (devices.length > 0) {
-    console.log(`✅ Found ${devices.length} Google Home device(s)`);
-  } else {
-    console.log('⚠️  No Google Home devices found - using fallback mode');
-  }
-});
+// Note: GoogleHomeService and InterventionCoordinator will be initialized after broadcast function is defined
 
 // Initialize OMI Service
 omiService.startListening().then(result => {
@@ -238,6 +238,7 @@ async function triggerDemoScenario(scenario, ws) {
 
     // Speak the voice message through ElevenLabs (natural voice) or Google Home fallback
     if (demoDecision.voice_message) {
+      console.log('🎙️  Voice message to speak:', demoDecision.voice_message.substring(0, 50) + '...');
       try {
         // Try ElevenLabs first for most natural voice
         const audioResult = await elevenLabsService.speak(demoDecision.voice_message, {
@@ -254,8 +255,10 @@ async function triggerDemoScenario(scenario, ws) {
         });
       } catch (elevenError) {
         console.log('⚠️  ElevenLabs error, falling back to Google Home:', elevenError.message);
-        // Fallback to Google Home
+        // Fallback to Google Home (which will use browser TTS if no device)
+        console.log('🔊 Calling googleHomeService.speak()...');
         await googleHomeService.speak(demoDecision.voice_message);
+        console.log('✅ Google Home speak completed');
       }
     }
 
@@ -342,7 +345,7 @@ function sendHistory(ws) {
 }
 
 // Broadcast to all clients
-function broadcast(data) {
+broadcast = function(data) {
   const message = JSON.stringify(data);
   let sentCount = 0;
   clients.forEach(client => {
@@ -352,7 +355,27 @@ function broadcast(data) {
     }
   });
   console.log(`📡 Broadcast ${data.type} to ${sentCount} client(s)`);
-}
+};
+
+// Initialize GoogleHomeService with broadcast function
+googleHomeService = new GoogleHomeService(broadcast);
+
+// Initialize InterventionCoordinator
+interventionCoordinator = new InterventionCoordinator(
+  patientProfile,
+  conversationEngine,
+  googleHomeService,
+  emailNotificationService
+);
+
+// Initialize Google Home discovery
+googleHomeService.discoverDevices().then(devices => {
+  if (devices.length > 0) {
+    console.log(`✅ Found ${devices.length} Google Home device(s)`);
+  } else {
+    console.log('⚠️  No Google Home devices found - using browser TTS fallback mode');
+  }
+});
 
 // REST API Routes
 
@@ -708,6 +731,46 @@ app.get('/api/pose/status', (req, res) => {
   res.json(poseAnalysisService.getStatus());
 });
 
+// Fetch.ai agent endpoints
+app.get('/api/fetchai/status', (req, res) => {
+  if (!fetchAIService) {
+    return res.json({ 
+      enabled: false, 
+      message: 'Fetch.ai not configured' 
+    });
+  }
+  res.json({
+    enabled: true,
+    stats: fetchAIService.getAgentStats()
+  });
+});
+
+// Video tracking endpoints
+app.post('/api/tracking/detect-frame', async (req, res) => {
+  try {
+    const { frameData, videoId, frameNumber } = req.body;
+    const detection = await videoTrackingService.detectPersonInFrame(frameData, videoId, frameNumber);
+    res.json(detection);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/tracking/stats', (req, res) => {
+  res.json(videoTrackingService.getCacheStats());
+});
+
+// Initialize Fetch.ai agent
+if (fetchAIService) {
+  fetchAIService.initialize().then(success => {
+    if (success) {
+      console.log('🤖 Fetch.ai Care Coordinator Agent: Active');
+    } else {
+      console.log('⚠️  Fetch.ai Care Coordinator Agent: Failed to initialize (continuing without)');
+    }
+  });
+}
+
 // Start server
 const PORT = config.port;
 server.listen(PORT, () => {
@@ -727,6 +790,7 @@ server.listen(PORT, () => {
   console.log('   ✅ Conversation Engine (Claude AI)');
   console.log('   ✅ Voice Service (Google Home)');
   console.log('   ✅ Intervention Coordinator');
+  console.log(`   ${fetchAIService ? '🤖' : '⚪'} Fetch.ai Agent Coordination`);
   console.log('');
   console.log(`👤 Patient: ${patientProfile.preferredName} (${patientProfile.cognitiveStage} stage)`);
   console.log('');

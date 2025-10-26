@@ -1,10 +1,12 @@
-require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 module.exports = {
   // API Keys
   anthropicApiKey: process.env.ANTHROPIC_API_KEY,
   openaiApiKey: process.env.OPENAI_API_KEY,
   creaoApiUrl: process.env.CREAO_API_URL,
+  fetchaiApiKey: process.env.FETCHAI_API_KEY,
+  geminiApiKey: process.env.GEMINI_API_KEY,
 
   // Server Configuration
   port: process.env.PORT || 5000,

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Video, Film, Eye, Play, Pause, UtensilsCrossed, Flame, Navigation, AlertTriangle } from 'lucide-react';
 import websocket from '../services/websocket';
+import axios from 'axios';
 
 function VideoMonitor() {
   const [currentVideo, setCurrentVideo] = useState(null);
@@ -9,7 +10,11 @@ function VideoMonitor() {
   const [scenario, setScenario] = useState(null);
   const [activeScenario, setActiveScenario] = useState(null);
   const [isContinuousDemo, setIsContinuousDemo] = useState(false);
+  const [trackingBox, setTrackingBox] = useState(null);
+  const [trackingEnabled, setTrackingEnabled] = useState(true);
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const trackingIntervalRef = useRef(null);
 
   // Listen for video selection and demo interventions from backend
   useEffect(() => {
@@ -102,6 +107,188 @@ function VideoMonitor() {
     }
   };
 
+  // Start tracking person in video
+  const startTracking = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    // Wait for video metadata to load
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    const initTracking = () => {
+      // Set canvas size to match video
+      canvas.width = video.videoWidth || video.clientWidth;
+      canvas.height = video.videoHeight || video.clientHeight;
+      
+      console.log('🎯 Starting video tracking...', {
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight,
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height
+      });
+      
+      // Start tracking immediately
+      detectPersonInCurrentFrame();
+      
+      // Track every 1000ms (1 FPS for API efficiency)
+      trackingIntervalRef.current = setInterval(() => {
+        detectPersonInCurrentFrame();
+      }, 1000);
+    };
+    
+    // If video is ready, start immediately
+    if (video.videoWidth > 0) {
+      initTracking();
+    } else {
+      // Wait for video to be ready
+      video.addEventListener('loadedmetadata', initTracking, { once: true });
+      // Fallback timeout
+      setTimeout(initTracking, 500);
+    }
+  };
+
+  // Stop tracking
+  const stopTracking = () => {
+    if (trackingIntervalRef.current) {
+      clearInterval(trackingIntervalRef.current);
+      trackingIntervalRef.current = null;
+    }
+    setTrackingBox(null);
+    
+    // Clear canvas
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+  };
+
+  // Detect person in current video frame
+  const detectPersonInCurrentFrame = async () => {
+    if (!videoRef.current || !canvasRef.current) {
+      console.log('⚠️ Video or canvas not ready');
+      return;
+    }
+    
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      
+      // Check if video has valid dimensions
+      if (!video.videoWidth || !video.videoHeight) {
+        console.log('⚠️ Video dimensions not ready');
+        return;
+      }
+      
+      console.log('📸 Capturing frame for tracking...');
+      
+      // Capture current frame
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = video.videoWidth;
+      tempCanvas.height = video.videoHeight;
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.drawImage(video, 0, 0);
+      const frameData = tempCanvas.toDataURL('image/jpeg', 0.8);
+      
+      // Get video ID from URL
+      const videoId = currentVideo?.split('/').pop()?.split('.')[0] || 'unknown';
+      const frameNumber = Math.floor(video.currentTime * 30); // Assuming 30fps
+      
+      console.log('🔍 Sending frame to backend...', { videoId, frameNumber });
+      
+      // Send to backend for detection
+      const response = await axios.post('http://localhost:5000/api/tracking/detect-frame', {
+        frameData,
+        videoId,
+        frameNumber
+      });
+      
+      console.log('✅ Detection response:', response.data);
+      
+      if (response.data.person_detected && response.data.bounding_box) {
+        console.log('👤 Person detected! Drawing box...');
+        setTrackingBox(response.data.bounding_box);
+        drawTrackingBox(response.data.bounding_box);
+      } else {
+        console.log('❌ No person detected in frame');
+        setTrackingBox(null);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    } catch (error) {
+      console.error('❌ Tracking error:', error);
+      console.error('Error details:', error.response?.data || error.message);
+    }
+  };
+
+  // Draw green tracking box on canvas (simplified - no skeleton)
+  const drawTrackingBox = (box) => {
+    if (!canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    // Clear previous drawing
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Convert percentage to pixels
+    const x = (box.x / 100) * canvas.width;
+    const y = (box.y / 100) * canvas.height;
+    const width = (box.width / 100) * canvas.width;
+    const height = (box.height / 100) * canvas.height;
+
+    // Draw green box with thicker lines for better visibility
+    ctx.strokeStyle = '#00ff00';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(x, y, width, height);
+
+    // Draw corner markers for better visibility
+    const cornerSize = 20;
+    ctx.lineWidth = 5;
+
+    // Top-left corner
+    ctx.beginPath();
+    ctx.moveTo(x, y + cornerSize);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x + cornerSize, y);
+    ctx.stroke();
+
+    // Top-right corner
+    ctx.beginPath();
+    ctx.moveTo(x + width - cornerSize, y);
+    ctx.lineTo(x + width, y);
+    ctx.lineTo(x + width, y + cornerSize);
+    ctx.stroke();
+
+    // Bottom-left corner
+    ctx.beginPath();
+    ctx.moveTo(x, y + height - cornerSize);
+    ctx.lineTo(x, y + height);
+    ctx.lineTo(x + cornerSize, y + height);
+    ctx.stroke();
+
+    // Bottom-right corner
+    ctx.beginPath();
+    ctx.moveTo(x + width - cornerSize, y + height);
+    ctx.lineTo(x + width, y + height);
+    ctx.lineTo(x + width, y + height - cornerSize);
+    ctx.stroke();
+
+    // Add label with background for better visibility
+    ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+    ctx.fillRect(x + 5, y - 30, 120, 25);
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('GRANDMOTHER', x + 10, y - 10);
+  };
+
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopTracking();
+    };
+  }, []);
+
   return (
     <div className="card">
       <div className="card-header">
@@ -132,25 +319,48 @@ function VideoMonitor() {
             <video
               ref={videoRef}
               src={currentVideo}
+              crossOrigin="anonymous"
               loop={!isContinuousDemo}
               playsInline
               className="w-full h-full object-contain"
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
+              onPlay={() => {
+                setIsPlaying(true);
+                if (trackingEnabled) startTracking();
+              }}
+              onPause={() => {
+                setIsPlaying(false);
+                stopTracking();
+              }}
               onEnded={() => {
                 if (isContinuousDemo) {
                   console.log('Continuous demo video ended');
                   setIsPlaying(false);
                 }
+                stopTracking();
               }}
+            />
+            
+            {/* Green box tracking overlay */}
+            <canvas
+              ref={canvasRef}
+              className="absolute top-0 left-0 w-full h-full pointer-events-none"
+              style={{ mixBlendMode: 'normal' }}
             />
 
             {/* Demo Video Indicator */}
-            <div className="absolute top-4 right-4">
+            <div className="absolute top-4 right-4 flex flex-col gap-2">
               <div className="flex items-center space-x-2 bg-purple-600 text-white px-3 py-1 rounded-full shadow-lg">
                 <Film className="w-4 h-4" />
                 <span className="text-sm font-medium">AI VIDEO</span>
               </div>
+              
+              {/* Tracking Indicator */}
+              {trackingEnabled && isPlaying && (
+                <div className="flex items-center space-x-2 bg-green-600 text-white px-3 py-1 rounded-full shadow-lg animate-pulse">
+                  <Eye className="w-4 h-4" />
+                  <span className="text-sm font-medium">TRACKING</span>
+                </div>
+              )}
             </div>
 
             {/* Persona Detection Overlay */}

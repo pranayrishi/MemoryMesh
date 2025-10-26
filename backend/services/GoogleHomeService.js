@@ -4,11 +4,12 @@
  */
 
 class GoogleHomeService {
-  constructor() {
+  constructor(broadcastFunction = null) {
     this.devices = [];
     this.selectedDevice = null;
     this.fallbackMode = true;
     this.voiceHistory = [];
+    this.broadcast = broadcastFunction; // Function to broadcast to WebSocket clients
   }
 
   /**
@@ -113,9 +114,29 @@ class GoogleHomeService {
 
   /**
    * Fallback TTS method (console + browser speech synthesis)
+   * Broadcasts message to frontend for audio playback
    */
   async speakFallback(message, options = {}) {
     console.log('💬 [TTS Fallback]:', message);
+    console.log('🔊 Broadcasting voice message to frontend for audio playback...');
+
+    // Broadcast to frontend for browser TTS playback
+    if (this.broadcast) {
+      this.broadcast({
+        type: 'tts_fallback',
+        message: message,
+        options: {
+          rate: options.rate || 0.95,
+          pitch: options.pitch || 1.0,
+          volume: options.volume || 1.0,
+          voice: options.voice || 'female' // Prefer female voice for warmth
+        },
+        timestamp: new Date().toISOString()
+      });
+      console.log('✅ Voice message sent to frontend for playback');
+    } else {
+      console.warn('⚠️  No broadcast function available - voice will not be heard');
+    }
 
     // Simulate speech delay
     const wordsPerMinute = 150;
@@ -128,7 +149,7 @@ class GoogleHomeService {
       success: true,
       message: message,
       method: 'fallback',
-      device: 'console/browser',
+      device: 'browser_tts',
       timestamp: new Date().toISOString()
     };
   }
